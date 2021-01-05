@@ -5,17 +5,26 @@ class Helper {
         if(preg_match('/^https?:\/\/[^\/]+/i', $url) > 0) { return $url; }
         if(preg_match('/^https?:\/\/[^\/]+/i', $baseUrl) === 0) { return $url; }
 
-        $scheme   = parse_url($baseUrl, PHP_URL_SCHEME);
-        $base_url = preg_replace('/\/[^\/]+$/i', '', $baseUrl);
-        $base_url = preg_replace('/^https?:\/\//i', '', $base_url);
+        $absolute_url = '';
 
-        $base = explode('/', $base_url);
-        $url  = explode('/', $url);
-        $url  = array_merge($base, $url);
-        $url  = array_intersect_key($url, array_unique(array_map('strtolower', $url)));
-        $url  = array_filter($url);
+        if(preg_match('/^\//i', $url) > 0) {
+            if(preg_match('/https?:\/\/[^\/]+/i', $baseUrl, $m) > 0) {
+                $absolute_url = $m[0].$url;
+            }
+        } else {
+            $scheme   = parse_url($baseUrl, PHP_URL_SCHEME);
+            $base_url = preg_replace('/\/[^\/]+$/i', '', $baseUrl);
+            $base_url = preg_replace('/^https?:\/\//i', '', $base_url);
 
-        return $scheme.'://'.implode('/', $url);
+            $base = explode('/', $base_url);
+            $url  = explode('/', $url);
+            $url  = array_merge($base, $url);
+            $url  = array_intersect_key($url, array_unique(array_map('strtolower', $url)));
+            $url  = array_filter($url);
+
+            $absolute_url = $scheme.'://'.implode('/', $url);
+        }
+        return $absolute_url;
     }
 
     public static function chineseToDigit($str)
