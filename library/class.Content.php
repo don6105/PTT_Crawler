@@ -7,9 +7,10 @@ class Content {
     private $link    = '';
     private $content = [];
 
-    public function __construct($MySQL)
+    public function __construct($MySQL, $Request)
     {
         $this->MySQL   = $MySQL;
+        $this->Request = $Request;
         $this->content = [
             'FormalPostDate' => null,
             'Header'         => '',
@@ -21,9 +22,7 @@ class Content {
     {
         if(!$this->getTodoData()) { return false; }
 
-        $Request = new Request();
-
-        $r = $Request->run($this->link);
+        $r = $this->Request->run($this->link);
         if(isset($r['http_code'], $r['response']) && $r['http_code'] == '200') {
             $html = $r['response'];
 
@@ -107,8 +106,13 @@ class Content {
     private function updateFormalPostDate()
     {
         $post_date = $this->content['FormalPostDate'];
-        $sql = "UPDATE {$this->table_main} SET FormalPostDate = '$post_date' WHERE ID = {$this->id}";
-        return $this->MySQL->executeSQL($sql);
+        if(preg_match('/^\d{4}(\-\d{2}){2} \d{2}(:\d{2}){2}&/i', $post_date) > 0) {
+            $sql = "UPDATE {$this->table_main} 
+                    SET FormalPostDate = '$post_date' 
+                    WHERE ID = {$this->id}";
+            return $this->MySQL->executeSQL($sql);
+        }
+        return false;
     }
 
     private function insertContent()

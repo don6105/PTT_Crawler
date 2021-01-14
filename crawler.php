@@ -3,14 +3,15 @@ include_once(__DIR__.'/config/config.php');
 
 $board_link = 'https://www.ptt.cc/bbs/Rent_apart/index.html';
 
-$MySQL = new MySQL(DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME);
+$Request = new Request();
+$MySQL   = new MySQL(DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME);
 $MySQL->query("TRUNCATE rent_apart");
 $MySQL->query("TRUNCATE rent_apart_ext");
 $MySQL->query("TRUNCATE rent_apart_content");
 
 $page = 0;
 while(true) {
-    $Board = new Board();
+    $Board = new Board($Request);
     $Board->init($board_link);
     $dom_list = $Board->getArticleList();
 
@@ -23,7 +24,7 @@ while(true) {
     $board_link = $Board->getPreviousPage();
     // save content of article
     while(true) {
-        $Content = new Content($MySQL);
+        $Content = new Content($MySQL, $Request);
         if(!$Content->init()) { break; }
         $Content->saveDB();
     }

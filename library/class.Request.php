@@ -6,6 +6,7 @@ class Request {
     public function __construct()
     {
         $this->expire_time = 60 * 60 * 12; // 12 hours
+        $this->cleanCache();
     }
 
     public function run($url, $timeout = 30, $data = null)

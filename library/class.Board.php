@@ -4,12 +4,17 @@ class Board {
     private $prev_page    = '';
     private $article_list = [];
 
+    public function __construct($Request)
+    {
+        $this->Request = $Request;
+    }
+
     public function init($boardLink)
     {
         $Request = new Request();
         $this->board_link = $boardLink;
 
-        $r = $Request->run($this->board_link);
+        $r = $this->Request->run($this->board_link);
         if(isset($r['http_code'], $r['response']) && $r['http_code'] == '200') {
             $html = $r['response'];
             $this->setPreviousPage($html);
