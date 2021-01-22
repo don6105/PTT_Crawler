@@ -1741,7 +1741,7 @@ class Connector
                     $this->sQuery->bindParam($param[0], $param[1]);
                 }
             }
-            $this->success = $this->sQuery->execute();
+            $this->success = @$this->sQuery->execute();
         } catch (PDOException $e) {
             // 服务端断开时重连一次
             if ($e->errorInfo[1] == 2006 || $e->errorInfo[1] == 2013) {

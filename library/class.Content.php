@@ -20,8 +20,16 @@ class Content {
 
     public function init()
     {
-        if(!$this->getTodoData()) { return false; }
+        $data = $this->getTodoData();
+        if(empty($data)) { return false; }
 
+        $this->id   = $data['ID'];
+        $this->link = $data['Link'];
+        return $this->lockTodoData() > 0;
+    }
+
+    public function http()
+    {
         $r = $this->Request->run($this->link);
         if(isset($r['http_code'], $r['response']) && $r['http_code'] == '200') {
             $html = $r['response'];
@@ -34,7 +42,6 @@ class Content {
             $this->setHeader($element);
             $this->setContent($element);
         }
-        return true;
     }
 
     public function saveDB()
@@ -43,23 +50,31 @@ class Content {
             echo basename(__FILE__).'Empty ArticleID.'.PHP_EOL;
             exit;
         }
+        $this->getLock();
         $this->updateFormalPostDate();
         $this->insertContent();
         $this->finishProcess();
+        $rate = $this->getFinishRate();
+        return $this->unLock($rate);
     }
 
 
 
     private function getTodoData()
     {
-        $sql  = "SELECT ID, Link FROM {$this->table_main} WHERE IsProcess = 0 ORDER BY ID ASC LIMIT 1";
-        $data = $this->MySQL->row($sql);
+        $expire = date('Y-m-d H:i:s', strtotime('-3 mins'));
+        $sql = "SELECT ID, Link 
+                FROM {$this->table_main}
+                WHERE IsProcess = 0 AND (LockTime IS NULL OR LockTime < '$expire')
+                ORDER BY ID ASC LIMIT 1";
+        return $this->MySQL->row($sql);
+    }
 
-        if(empty($data)) { return false; }
-
-        $this->id   = $data['ID'];
-        $this->link = $data['Link'];
-        return true;
+    private function lockTodoData()
+    {
+        if(empty($this->id)) { return false; }
+        $sql = "UPDATE {$this->table_main} SET LockTime=NOW() WHERE ID = {$this->id}";
+        return $this->MySQL->executeSQL($sql);
     }
 
     private function setHeader($element)
@@ -105,12 +120,14 @@ class Content {
 
     private function updateFormalPostDate()
     {
+        if(empty($this->id)) { return false; }
+
         $post_date = $this->content['FormalPostDate'];
         if(preg_match('/^\d{4}(\-\d{2}){2} \d{2}(:\d{2}){2}&/i', $post_date) > 0) {
             $sql = "UPDATE {$this->table_main} 
                     SET FormalPostDate = '$post_date' 
                     WHERE ID = {$this->id}";
-            return $this->MySQL->executeSQL($sql);
+            return @$this->MySQL->executeSQL($sql);
         }
         return false;
     }
@@ -126,13 +143,45 @@ class Content {
             return empty($c)? $d : $c.','.$d;
         }, '');
         $sql = "INSERT IGNORE INTO {$this->table_content}($colums) VALUES($values)";
-        return $this->MySQL->executeSQL($sql);
+        return @$this->MySQL->executeSQL($sql);
     }
 
     private function finishProcess()
     {
         $sql = "UPDATE {$this->table_main} SET IsProcess = 1 WHERE ID = {$this->id}";
         return $this->MySQL->executeSQL($sql);
+    }
+
+    private function getFinishRate()
+    {
+        $sql = "SELECT 
+                    SUM(CASE WHEN IsProcess > 0 THEN 1 ELSE 0 END) AS Done, 
+                    COUNT(1) AS Total
+                FROM {$this->table_main}";
+        $r = $this->MySQL->row($sql);
+        $done  = floatval($r['Done']);
+        $total = floatval($r['Total']);
+        $rate  = ($total === 0.0)? 0.0 : ($done / $total * 100.0);
+        return sprintf('%03.1f%%', $rate);
+    }
+
+    private function getLock()
+    {
+        $this->key = ftok(dirname(__DIR__), 'a');
+        $this->sem = sem_get($this->key);
+        while(true) {
+            if(sem_acquire($this->sem, false)) { 
+                return true;
+            }
+            usleep(2000);
+        }
+    }
+
+    private function unLock($rate)
+    {
+        $shm = shm_attach($this->key, 10240, 0666);
+        shm_put_var($shm, 1, $rate);
+        return sem_release($this->sem);
     }
 }
 ?>

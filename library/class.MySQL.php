@@ -3,7 +3,7 @@ class MySQL extends Connector {
     public function __construct($host, $port, $user, $password, $dbName)
     {
         parent::__construct($host, $port, $user, $password, $dbName);
-        
+        $this->adjustTimeZone();
         $this->createTableMain();
         $this->createTableContent();
         $this->createTableExt();
@@ -12,15 +12,29 @@ class MySQL extends Connector {
     public function executeSQL($sql)
     {
         $r = null;
-        try {
-            $r = $this->query($sql); 
-        } catch (Exception $e) {
-            echo $e->getMessage().PHP_EOL;
+        for($i = 0; $i < 3; ++$i) {
+            try {
+                $r = $this->query($sql); 
+                break;
+            } catch (Exception $e) {
+                echo $e->getMessage().PHP_EOL;
+            }
         }
         return $r;
     }
 
 
+
+    private function adjustTimeZone()
+    {
+        $init_tz    = date_default_timezone_get();
+        $time       = new \DateTime('now', new DateTimeZone($init_tz));
+        $gmt_offset = $time->format('P');
+
+        try {
+            $this->query("set time_zone = '$gmt_offset'");
+        } catch (Exception $e) {}
+    }
 
     private function createTableMain()
     {
@@ -35,6 +49,7 @@ class MySQL extends Connector {
                 `FormalPostDate` timestamp NULL DEFAULT NULL,
                 `AddTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `IsProcess` tinyint(4) NOT NULL DEFAULT '0' COMMENT '0 = todo, 1 = get_content_finished, 2= format_finished',
+                `LockTime` timestamp NULL DEFAULT NULL,
                 PRIMARY KEY (`ID`)
             ) ENGINE=MyISAM DEFAULT CHARSET=utf8
             ";
@@ -65,7 +80,7 @@ class MySQL extends Connector {
         }
     }
 
-    public function createTableExt()
+    private function createTableExt()
     {
         $sql = "
             CREATE TABLE IF NOT EXISTS `rent_apart_ext` (
